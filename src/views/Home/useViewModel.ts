@@ -18,10 +18,18 @@ import useStore from '@/store'
 import { selectCard } from '@/utils'
 import { rgba } from '@/utils/color'
 import { LotteryStatus } from './type'
-import { confettiFire, createSphereVertices, createTableVertices, getRandomElements, initTableData } from './utils'
+import { confettiFire, createSphereVertices, createTableVertices, getRandomElements, getRandomElementsWithPrize, initTableData } from './utils'
+
+/////////// add ///////////
+import { useAppointRules } from '@/hooks/useAppointRules'
+/////////// add ///////////
 
 const maxAudioLimit = 10
 export function useViewModel() {
+    /////////// add ///////////
+    const { appointRules } = useAppointRules()
+    /////////// add ///////////
+
     const toast = useToast()
     // store里面存储的值
     const { personConfig, globalConfig, prizeConfig } = useStore()
@@ -526,7 +534,16 @@ export function useViewModel() {
         }
         luckyCount.value = leftover < luckyCount.value ? leftover : luckyCount.value
         // 重构抽奖函数
-        luckyTargets.value = getRandomElements(personPool.value, luckyCount.value)
+        //luckyTargets.value = getRandomElements(personPool.value, luckyCount.value)
+        /////////// add ///////////
+        //console.log("~~~中奖名单")
+        //console.log(personConfig.getAlreadyPersonList)
+        luckyTargets.value = getRandomElementsWithPrize(personPool.value, luckyCount.value, currentPrize.value.id != null
+                ? String(currentPrize.value.id)
+                : null, 
+                appointRules.value, personConfig.getAlreadyPersonList)
+        /////////// add ///////////
+
         luckyTargets.value.forEach((item) => {
             const index = personPool.value.findIndex(person => person.id === item.id)
             if (index > -1) {

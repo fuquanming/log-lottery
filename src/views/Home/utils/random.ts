@@ -54,3 +54,101 @@ export function getRandomElements<T>(sourceArray: T[], count: number): T[] {
 
     return result
 }
+
+
+
+import type { AppointRule } from '@/types/appoint'
+/**
+ * @description 从源数组中随机获取指定数量的元素（支持指定奖项指定人）
+ */
+export function getRandomElementsWithPrize<
+    T extends { uid?: string }
+>(
+    sourceArray: T[],
+    count: number,
+    currentPrizeId: string | null, // 当前抽奖的奖项
+    appointRules: AppointRule[], // 指定奖项、人员
+    alreadyPersonList: T[] // personConfig.getAlreadyPersonList 已中奖人员
+): T[] {
+    if (count <= 0) return []
+  if (!currentPrizeId) {
+    return getRandomElements(sourceArray, count)
+  }
+
+  // 1、已中奖人员 UID（绝对排除）
+  const alreadyWinUidSet = new Set(
+    alreadyPersonList
+      .map(p => p.uid)
+      .filter(Boolean)
+  )
+
+  // 2、当前奖项指定人员
+  const currentPrizeUidSet = new Set(
+    appointRules
+      .filter(r => r.prizeId === currentPrizeId)
+      .map(r => r.personUid)
+  )
+
+  // 3、所有被指定过的人员
+  const allAppointUidSet = new Set(
+    appointRules.map(r => r.personUid)
+  )
+
+  const appointPersons: T[] = []
+  const normalPool: T[] = []
+
+  sourceArray.forEach(item => {
+    if (!item.uid) return
+
+    // 已中奖：绝对排除
+    if (alreadyWinUidSet.has(item.uid)) {
+      return
+    }
+
+    // 被指定过的人
+    if (allAppointUidSet.has(item.uid)) {
+      // 只允许在“自己的奖项”出现
+      if (currentPrizeUidSet.has(item.uid)) {
+        appointPersons.push(item)
+      }
+      return
+    }
+
+    // 普通人
+    normalPool.push(item)
+  })
+
+  // 4、结果：优先指定人员
+  const result: T[] = []
+  for (let i = 0; i < appointPersons.length && result.length < count; i++) {
+    result.push(appointPersons[i])
+  }
+
+  const remainingCount = count - result.length
+  if (remainingCount <= 0) {
+    // 防止顺序可疑
+    return shuffleBrowserCrypto(result).slice(0, count)
+  }
+
+  // 5、普通人员随机补位
+  const newArray = [...normalPool]
+  for (let i = 0; i < remainingCount && newArray.length > 0; i++) {
+    const randomBuffer = new Uint32Array(1)
+    crypto.getRandomValues(randomBuffer)
+    const randomIndex = randomBuffer[0] % newArray.length
+
+    result.push(newArray[randomIndex])
+    newArray.splice(randomIndex, 1)
+  }
+
+  // 6、最终洗牌（隐藏内定）
+  return shuffleBrowserCrypto(result)
+}
+/*
+nginx 配置
+location /log-lottery/ {
+    alias /home/log-lottery/dist/;
+    index index.html;
+    try_files $uri $uri/ /log-lottery/index.html;
+}
+*/
